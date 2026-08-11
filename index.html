@@ -90,7 +90,7 @@ const laneY = i => TRACK_TOP + LANE_H * (i + 0.5);
 const PLAYER_X = 196;              // player's fixed screen x
 
 const CRUISE = 3.2, BOOST = 5.9, BRAKE = 1.5, TURBO = 8.6;
-const GRAV = 0.5;
+const GRAV = 0.44;   // lower gravity → longer hang time for more flips/tricks
 const HEAT_UP = 0.475, HEAT_DOWN = 1.15, HEAT_MAX = 100;
 const NUM_RIVALS = 3;              // 4 racers total, one per lane
 
@@ -169,6 +169,7 @@ function startRace(r){
     speed: CRUISE, heat: 0, overheat: 0, crash: 0,
     angle: 0, angVel: 0, flips: 0, wheelie: 0,
     finishTime: null, wheelSpin: 0, bump: 0, lastRampX: null, tossCount: 0, tossCd: 0, turbo: 0,
+    _actHeld: true,   // treat a held-from-start SPACE as already down, so it won't auto-hop at the line
   };
   const rivals = RIVALS.slice(0, NUM_RIVALS).map((rd,i)=>({
     color: rd.color, name: rd.name,
@@ -199,9 +200,9 @@ function buildTrack(cfg){
   let x = 720;
   while(x < cfg.distance - 460){
     const steep = rng();                 // 0 = mellow kicker, 1 = steep launch
-    const lift  = 22 + steep*16;                  // visual crest height / incline (22..38)
-    const power = 0.82 + steep*0.30 + rng()*0.06;  // jump size (~0.82..1.18)
-    G.ramps.push({ worldX:x, w: 96 + rng()*70, lift, power });
+    const lift  = 16 + steep*52;                   // crest height / incline (16..68) — steeper & more varied
+    const power = 0.72 + steep*0.62 + rng()*0.12;  // jump size (~0.72..1.46) — bigger air off the steep kickers
+    G.ramps.push({ worldX:x, w: 72 + rng()*180, lift, power });  // length 72..252 — short punchy → long mellow
     // sometimes a trash pile just past the ramp (single lane) to jump/clear
     if(rng() < 0.6){
       const lane = (rng()*LANES)|0;
@@ -233,7 +234,7 @@ function buildTrack(cfg){
   }
   // Keep pads on flat ground: skip the takeoff→landing zone of every ramp
   // (the player is airborne there, so on-ground pads wouldn't register).
-  const RAMP_BACK = 22, RAMP_AIR = 300;
+  const RAMP_BACK = 22, RAMP_AIR = 360;   // longer airtime → keep pads clear further past each ramp
   const flatX = (px)=>{
     for(let g=0; g<24; g++){
       let bumped=false;
@@ -363,6 +364,7 @@ const sfx = {
   cool(){ beep(1180,0.08,'sine',0.05); beep(760,0.14,'sine',0.05); },
   turbo(){ beep(320,0.05,'sawtooth',0.06); beep(640,0.07,'square',0.06); beep(1040,0.11,'square',0.05); },
   toss(){ beep(300,0.05,'square',0.05); beep(200,0.08,'square',0.04); },
+  jump(){ beep(520,0.06,'square',0.05); beep(820,0.10,'sine',0.05); },
   overheat(){ beep(90,0.4,'sawtooth',0.09); },
   win(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,0.14,'square',0.05),i*90)); cheer(true); },
   lose(){ [400,300,220,150].forEach((f,i)=>setTimeout(()=>beep(f,0.18,'sawtooth',0.06),i*130)); },
@@ -509,12 +511,52 @@ function update(){
     if(keys.up && !p._upHeld){ p.lane = Math.max(0, p.lane-1); }
     if(keys.down && !p._dnHeld){ p.lane = Math.min(LANES-1, p.lane+1); }
     p._upHeld = keys.up; p._dnHeld = keys.down;
-    // ease toward lane y
-    p.y += (laneY(p.lane) - p.y)*0.35;
-    // Auto-wheelie: the nose lifts whenever the can is boosting (held BURN or a turbo pad)
-    const boosting = (keys.boost || p.turbo>0) && p.crash===0 && p.overheat===0 && p.speed>2.5;
-    if(boosting){ p.angle += (-0.5 - p.angle)*0.18; }   // ease into a wheelie tilt
-    else        { p.angle *= 0.6; }                     // settle back flat
+
+    // ---- Ramp: roll up the incline, LAUNCH off the takeoff lip at the far end ----
+    let onRamp=null, rampT=0, launched=false;
+    if(p.crash===0 && p.overheat===0){
+      for(const rp of G.ramps){
+        if(rp.worldX===p.lastRampX) continue;
+        const half=rp.w*0.5, toe=rp.worldX-half, crest=rp.worldX+half;  // crest = far (right) edge
+        if(p.worldX>=crest && p.worldX < crest + Math.max(48, p.speed*4)){
+          // rolled off the lip at the END of the ramp → this is the launch point
+          const kick = rp.power || 1;               // steeper/bigger ramps launch higher
+          p.air = true; p.lastRampX = rp.worldX;
+          // dynamic cap: keep the apex on-screen regardless of lane or how high the lip lifted us
+          const vyCap = Math.min(14.0, Math.sqrt(2*GRAV*Math.max(20, p.y - 8)));
+          p.vy = -Math.min((8.4 + p.speed*0.62) * kick, vyCap);
+          p.angVel = -(0.02 + p.speed*0.004) * (0.7 + kick*0.4); // gentle takeoff tip; auto-levels
+          p.totalRot = 0; p.tossCount = 0; p.tossCd = 0;
+          launched = true; break;
+        }
+        if(p.worldX>toe && p.worldX<crest){ onRamp=rp; rampT=(p.worldX-toe)/rp.w; break; }
+      }
+    }
+
+    if(!launched){
+      if(onRamp){
+        // climb the slope: ground rises from the toe (0) to the takeoff lip (full lift)
+        const targetY = laneY(p.lane) - onRamp.lift*rampT;
+        p.y += (targetY - p.y)*0.5;
+        // nose tips up to match the ramp's steepness (rise / run)
+        const slope = -Math.min(0.85, (onRamp.lift/onRamp.w)*2.2);
+        p.angle += (slope - p.angle)*0.3;
+      } else if(keys.action && !p._actHeld && p.crash===0 && p.overheat===0){
+        // ---- SPACE = manual HOP off flat ground: clear an obstacle, or set up a flip / trash-toss with no ramp ----
+        p.air = true; p.lastRampX = null;
+        const vyCap = Math.min(14.0, Math.sqrt(2*GRAV*Math.max(20, p.y - 8)));
+        p.vy = -Math.min(8.8 + p.speed*0.45, vyCap);   // solid hop — enough hang time for a flip
+        p.angVel = 0; p.totalRot = 0; p.tossCount = 0; p.tossCd = 0;
+        sfx.jump(); addPop(PLAYER_X, p.y-40, 'HOP', '#9fe86b');
+      } else {
+        // ease toward lane y (flat ground)
+        p.y += (laneY(p.lane) - p.y)*0.35;
+        // Auto-wheelie: the nose lifts whenever the can is boosting (held BURN or a turbo pad)
+        const boosting = (keys.boost || p.turbo>0) && p.crash===0 && p.overheat===0 && p.speed>2.5;
+        if(boosting){ p.angle += (-0.5 - p.angle)*0.18; }   // ease into a wheelie tilt
+        else        { p.angle *= 0.6; }                     // settle back flat
+      }
+    }
   } else {
     // Airborne physics
     p.vy += GRAV;
@@ -581,23 +623,6 @@ function update(){
     }
   }
   p._actHeld = keys.action;   // for edge-detecting SPACE taps (air trick)
-
-  // ---- Ramps: full-width, launch from any lane; chain onto a NEW ramp on landing ----
-  if(!p.air && p.crash===0 && p.overheat===0){
-    for(const rp of G.ramps){
-      const dx = rp.worldX - p.worldX;
-      if(Math.abs(dx) < rp.w*0.5 + 6 && rp.worldX !== p.lastRampX){   // skip the ramp we just left (no bounce)
-        const kick = rp.power || 1;               // steeper/bigger ramps launch higher
-        p.air = true;
-        p.lastRampX = rp.worldX;
-        p.vy = -(6.8 + p.speed*0.52) * kick;      // lower arc so fast/turbo jumps stay on screen
-        p.angVel = -(0.02 + p.speed*0.004) * (0.7 + kick*0.4); // gentle takeoff tip; auto-levels
-        p.totalRot = 0;
-        p.tossCount = 0; p.tossCd = 0;
-        break;
-      }
-    }
-  }
 
   // ---- Obstacles ----
   for(const ob of G.obstacles){
@@ -1322,7 +1347,7 @@ function drawTitle(){
   row(cap('\u25B2 \u25BC','\u25B2 \u25BC'), 'change lane  \u00B7  flip while in the air', py+52);
   row(cap('\u2192','BURN'),  'hold to BURN turbo \u2014 mind the TEMP', py+76);
   row(cap('\u2190','BRAKE'), 'brake', py+100);
-  row(cap('SPACE','TOSS'),   'toss trash while airborne (trick)', py+124);
+  row(cap('SPACE','JUMP'),   'JUMP on the ground · toss trash while airborne', py+124);
 
   // notes (bulleted)
   ctx.textAlign='left'; ctx.font='700 12px "Courier New",monospace';
