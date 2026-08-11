@@ -120,7 +120,6 @@ function raceConfig(r){
     coinDensity: Math.max(0.10, 0.30 - rr*0.03),
     arrowGap: 820 + rr*110,   // cooling-arrow spacing; grows so late races cool less
     turboGap: 700 + rr*80,    // red turbo-pad spacing
-    timeLimit: Math.max(20, 30 - rr*1.8),   // seconds; tightens → must BURN → overheat risk
   });
 }
 
@@ -169,6 +168,7 @@ function startRace(r){
     speed: CRUISE, heat: 0, overheat: 0, crash: 0,
     angle: 0, angVel: 0, flips: 0, wheelie: 0,
     finishTime: null, wheelSpin: 0, bump: 0, lastRampX: null, tossCount: 0, tossCd: 0, turbo: 0,
+    hopMeter: 1,      // full = ready to hop; drains on a non-ramp hop, then refills
     _actHeld: true,   // treat a held-from-start SPACE as already down, so it won't auto-hop at the line
   };
   const rivals = RIVALS.slice(0, NUM_RIVALS).map((rd,i)=>({
@@ -484,6 +484,8 @@ function update(){
 
   const cfg = G.cfg, p = G.player;
   G.time += 1/60;
+  // HOP meter refills over ~2.3s so non-ramp hops can't be spammed (ramp launches are free)
+  G.player.hopMeter = Math.min(1, (G.player.hopMeter||0) + 0.0072);
 
   // ---- Player longitudinal ----
   if(p.overheat>0){
@@ -541,9 +543,10 @@ function update(){
         // nose tips up to match the ramp's steepness (rise / run)
         const slope = -Math.min(0.85, (onRamp.lift/onRamp.w)*2.2);
         p.angle += (slope - p.angle)*0.3;
-      } else if(keys.action && !p._actHeld && p.crash===0 && p.overheat===0){
+      } else if(keys.action && !p._actHeld && p.crash===0 && p.overheat===0 && p.hopMeter>=1){
         // ---- SPACE = manual HOP off flat ground: clear an obstacle, or set up a flip / trash-toss with no ramp ----
-        p.air = true; p.lastRampX = null;
+        // Costs a full HOP meter (ramp launches are free); it must refill before the next hop.
+        p.air = true; p.lastRampX = null; p.hopMeter = 0;
         const vyCap = Math.min(14.0, Math.sqrt(2*GRAV*Math.max(20, p.y - 8)));
         p.vy = -Math.min(8.8 + p.speed*0.45, vyCap);   // solid hop — enough hang time for a flip
         p.angVel = 0; p.totalRot = 0; p.tossCount = 0; p.tossCd = 0;
@@ -573,7 +576,7 @@ function update(){
     }
     // SPACE tapped in the air = TRASH TOSS — a separate scored trick (flips are on ▲▼)
     if(p.tossCd>0) p.tossCd--;
-    if(keys.action && !p._actHeld && p.crash===0 && p.tossCd===0 && p.tossCount<6){
+    if(keys.action && !p._actHeld && p.crash===0 && p.tossCd===0 && p.tossCount<1){   // one toss per jump/hop
       p.tossCount++; p.tossCd = 7; addScore(150);
       addPop(PLAYER_X, p.y-46, 'TRASH TOSS +150', '#ffb24a'); sfx.toss();
       const TRASH = ['can','banana','apple','paper','bag'];
@@ -698,11 +701,7 @@ function update(){
     finishRace();
     return;
   }
-  if(G.time >= cfg.timeLimit && p.finishTime===null){
-    // ran out of time
-    resultScreen(false, 'TIME UP', computePlace());
-    return;
-  }
+  // No time limit — the race ends only when you cross the line; finish TOP 3 to survive.
 
   // popups drift
   for(const pop of G.pops){ pop.y -= 0.8; pop.life--; }
@@ -1222,10 +1221,15 @@ function drawHUD(){
   ctx.fillStyle='#ff7a1a'; ctx.fillRect(0,barY,W,2);
   ctx.textBaseline='middle'; ctx.font='700 13px "Courier New",monospace';
 
-  // TIME (counts down toward limit)
-  const remain = Math.max(0, G.cfg.timeLimit - G.time);
-  ctx.textAlign='left'; ctx.fillStyle= remain<6?'#e23b3b':'#ffd23f';
-  ctx.fillText('TIME '+remain.toFixed(1).padStart(4,'0'), 10, barY+13);
+  // HOP meter — must refill before another non-ramp hop (no race timer anymore)
+  const hx=12, hw=118, hy=barY+7, hh=10;
+  const hm=Math.max(0, Math.min(1, G.player.hopMeter||0)), ready=hm>=1;
+  ctx.fillStyle='#111'; ctx.fillRect(hx-2,hy-2,hw+4,hh+4);
+  ctx.fillStyle= ready?'#8dff2f':'#5a7a3a'; ctx.fillRect(hx,hy,hw*hm,hh);
+  ctx.strokeStyle='#666'; ctx.lineWidth=1; ctx.strokeRect(hx,hy,hw,hh);
+  ctx.textAlign='left'; ctx.font='700 10px "Courier New",monospace';
+  ctx.fillStyle= ready?'#8dff2f':'#e8dcc0';
+  ctx.fillText(ready?'HOP READY':'HOP', hx, hy-8);
 
   // TEMP gauge (Excitebike homage)
   const gx=170, gw=150, gy=barY+7, gh=10;
@@ -1365,7 +1369,7 @@ function drawIntro(){
   ctx.font='700 22px "Courier New",monospace'; ctx.fillStyle='#ffd23f';
   ctx.fillText(G.cfg.name, W/2, 266);
   ctx.font='600 13px "Courier New",monospace'; ctx.fillStyle='#e8dcc0';
-  ctx.fillText(NUM_RIVALS+' rivals · '+Math.round(G.cfg.timeLimit)+'s limit · finish TOP 3', W/2, 296);
+  ctx.fillText(NUM_RIVALS+' rivals · finish TOP 3 to survive', W/2, 296);
 }
 
 function drawResult(){
