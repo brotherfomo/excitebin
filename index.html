@@ -65,7 +65,7 @@
 <div id="touch">
   <div class="tbtn" id="b-up">▲</div>
   <div class="tbtn" id="b-dn">▼</div>
-  <div class="tbtn" id="b-toss">TOSS</div>
+  <div class="tbtn" id="b-toss">JUMP</div>
   <div class="tbtn" id="b-brake">BRAKE</div>
   <div class="tbtn" id="b-boost">BURN</div>
 </div>
@@ -442,6 +442,7 @@ function bindTouch(id, key){
 }
 bindTouch('b-up','up'); bindTouch('b-dn','down');
 bindTouch('b-boost','boost'); bindTouch('b-brake','brake'); bindTouch('b-toss','action');
+const jumpBtn = document.getElementById('b-toss');   // labels JUMP (ground) / TOSS (air) in the loop
 function pointerPos(e){
   const r = cv.getBoundingClientRect();
   const src = (e.touches && e.touches[0]) ? e.touches[0]
@@ -1420,6 +1421,14 @@ function loop(now){
   render();
   const te = document.getElementById('touch');
   if(te && te.classList) te.classList.toggle('playing', mode==='race' || mode==='intro');
+  // The action button jumps on the ground and tosses in the air — label it for what it does now,
+  // and dim it on the ground until the HOP meter has refilled.
+  if(IS_TOUCH && jumpBtn){
+    const airborne = mode==='race' && G.player && G.player.air;
+    jumpBtn.textContent = airborne ? 'TOSS' : 'JUMP';
+    const ready = airborne || !(mode==='race' && G.player) || G.player.hopMeter>=1;
+    jumpBtn.style.opacity = ready ? '1' : '0.4';
+  }
   requestAnimationFrame(loop);
 }
 // initial title state (need a dummy G for menu-free rendering of title)
