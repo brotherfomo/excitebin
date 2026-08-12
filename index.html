@@ -1253,12 +1253,21 @@ function drawHUD(){
   ctx.fillStyle='#e8dcc0'; ctx.font='700 12px "Courier New",monospace';
   ctx.fillText('RACE '+G.race, 520, barY+13);
 
-  // SCORE + coins
-  ctx.textAlign='right'; ctx.fillStyle= G.tampered?'#e23b3b':'#ffd23f'; ctx.font='800 14px "Courier New",monospace';
-  ctx.fillText((G.tampered?'⚠ ':'')+'◆'+G.coins+'   '+G.score.toLocaleString(), W-10, barY+13);
+  // SCORE + coins — on touch, move to the top-right so the BURN button can't cover it
+  const scoreTxt = (G.tampered?'⚠ ':'')+'◆'+G.coins+'   '+G.score.toLocaleString();
+  ctx.font='800 14px "Courier New",monospace';
+  const scoreY = IS_TOUCH ? 24 : barY+13;
+  if(IS_TOUCH){                                   // dark backing so it stays legible over the sky/sun
+    const stw = ctx.measureText(scoreTxt).width;
+    ctx.fillStyle='rgba(5,7,10,0.6)'; roundRect(W-16-stw, scoreY-13, stw+12, 22, 5); ctx.fill();
+  }
+  ctx.textAlign='right'; ctx.fillStyle= G.tampered?'#e23b3b':'#ffd23f';
+  ctx.fillText(scoreTxt, W-10, scoreY);
 
-  // ---- Sound On/Off toggle switch ----
+  // ---- Sound On/Off toggle switch ----  (top-left on touch, clear of the thumb buttons)
   const on = !muted;
+  const sndOX = IS_TOUCH ? -570 : 0, sndOY = IS_TOUCH ? -(barY-8) : 0;
+  ctx.save(); ctx.translate(sndOX, sndOY);
   const tw=38, th=14, tx=612, ty=barY+5, cyc=barY+12;
   // speaker cone
   ctx.fillStyle = on ? '#ffd23f' : '#8a8a8a';
@@ -1280,7 +1289,8 @@ function drawHUD(){
   const kx = on ? tx+tw-th/2 : tx+th/2;
   ctx.fillStyle = on ? '#fff5d0' : '#9a9a9a';
   ctx.beginPath(); ctx.arc(kx, ty+th/2, th/2-2, 0, 7); ctx.fill();
-  soundBtn = { x:584, y:barY, w:68, h:24 };   // clickable region (speaker + pill)
+  ctx.restore();
+  soundBtn = { x:584+sndOX, y:barY+sndOY, w:68, h:24 };   // clickable region (speaker + pill), follows the toggle
 
   // top progress bar
   const prog = Math.min(1, G.player.worldX / G.cfg.distance);
