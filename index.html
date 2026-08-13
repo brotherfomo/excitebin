@@ -16,14 +16,20 @@
     background:
       radial-gradient(circle at 50% -10%, #23301a 0%, #0b0e08 55%, #05060a 100%);
     display:flex; align-items:center; justify-content:center;
-    min-height:100vh; font-family:'Courier New',monospace; color:var(--dust);
+    font-family:'Courier New',monospace; color:var(--dust);
     overflow:hidden; padding:8px;
-    position:fixed; inset:0; overscroll-behavior:none; touch-action:none;
+    /* height = the VISIBLE viewport (dvh excludes the mobile browser toolbar); vh is the fallback */
+    position:fixed; top:0; left:0; right:0;
+    height:100vh; height:100dvh;
+    overscroll-behavior:none; touch-action:none;
     -webkit-tap-highlight-color:transparent; user-select:none;
   }
   #wrap{
-    position:relative; width:min(96vw, calc(96vh * 1.6), 800px);
-    aspect-ratio:8/5; max-height:96vh;
+    position:relative;
+    width:min(96vw, calc(96vh * 1.6), 800px);
+    width:min(96vw, calc(96dvh * 1.6), 800px);
+    aspect-ratio:8/5;
+    max-height:96vh; max-height:96dvh;
     border:4px solid #000;
     box-shadow:0 0 0 4px #2a2f22, 0 18px 50px rgba(0,0,0,.7), inset 0 0 0 2px #000;
     background:#000; image-rendering:pixelated;
