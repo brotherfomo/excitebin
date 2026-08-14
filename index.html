@@ -1373,7 +1373,7 @@ function drawTitle(){
   };
   const cap = (kbd, touch)=> IS_TOUCH ? touch : kbd;
   row(cap('▲ ▼','▲ ▼'), 'change lane  ·  flip in the air', py+50);
-  row(cap('→','BURN'),  'hold to boost  ·  watch the TEMP', py+75);
+  row(cap('→','BURN'),  'hold to boost (mind the TEMP)', py+75);
   row(cap('←','BRAKE'), 'brake', py+100);
   row(cap('SPACE','JUMP'),   'jump  ·  toss trash in the air', py+125);
 
@@ -1381,12 +1381,16 @@ function drawTitle(){
   ctx.strokeStyle='rgba(255,122,26,0.25)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(px+24, py+148); ctx.lineTo(px+pw-24, py+148); ctx.stroke();
 
-  // rules / tips — icons in an aligned column
-  const tipIx = px+30, tipTx = px+50;
-  ctx.textAlign='left'; ctx.font='700 12px "Courier New",monospace';
-  ctx.fillStyle='#5fd8ff'; ctx.fillText('▸', tipIx, py+168); ctx.fillStyle='#e8dcc0'; ctx.fillText('blue pads cool  ·  red pads = TURBO', tipTx, py+168);
-  ctx.fillStyle='#ff7a1a'; ctx.fillText('★', tipIx, py+187); ctx.fillStyle='#e8dcc0'; ctx.fillText("finish TOP 3 each race, or you're TRASHED", tipTx, py+187);
-  ctx.fillStyle='#ffd23f'; ctx.fillText('★', tipIx, py+206); ctx.fillStyle='#e8dcc0'; ctx.fillText('flip + toss in one jump = COMBO bonus', tipTx, py+206);
+  // rules / tips — centered lines; each colored lead icon sits with its text
+  const centerSegs = (segs, y)=>{
+    ctx.textAlign='left'; ctx.font='700 12px "Courier New",monospace';
+    let total=0; for(const s of segs) total += ctx.measureText(s.t).width;
+    let x = W/2 - total/2;
+    for(const s of segs){ ctx.fillStyle=s.c; ctx.fillText(s.t, x, y); x += ctx.measureText(s.t).width; }
+  };
+  centerSegs([{t:'▸ ',c:'#5fd8ff'},{t:'blue pads cool',c:'#e8dcc0'},{t:'   ',c:'#e8dcc0'},{t:'▸ ',c:'#e23b3b'},{t:'red pads = TURBO',c:'#e8dcc0'}], py+168);
+  centerSegs([{t:'★ ',c:'#ff7a1a'},{t:"finish TOP 3 each race, or you're TRASHED",c:'#e8dcc0'}], py+188);
+  centerSegs([{t:'★ ',c:'#ffd23f'},{t:'flip + toss in one jump = COMBO bonus',c:'#e8dcc0'}], py+208);
 }
 
 function drawIntro(){
