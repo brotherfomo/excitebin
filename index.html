@@ -1344,37 +1344,49 @@ function drawTitle(){
   ctx.fillText(IS_TOUCH ? 'TAP TO RACE' : 'PRESS SPACE / TAP TO RACE', W/2, 240);
 
   // ---- controls card ----
-  const px = W/2-262, py = 262, pw = 524, ph = 198;
-  ctx.fillStyle='rgba(8,6,3,0.55)'; roundRect(px,py,pw,ph,12); ctx.fill();
-  ctx.strokeStyle='rgba(255,122,26,0.45)'; ctx.lineWidth=1.5; roundRect(px,py,pw,ph,12); ctx.stroke();
+  const px = W/2-250, py = 252, pw = 500, ph = 216;
+  ctx.fillStyle='rgba(10,7,3,0.66)'; roundRect(px,py,pw,ph,14); ctx.fill();
+  ctx.strokeStyle='rgba(255,122,26,0.5)'; ctx.lineWidth=1.5; roundRect(px,py,pw,ph,14); ctx.stroke();
 
-  ctx.textAlign='center'; ctx.font='800 14px "Courier New",monospace'; ctx.fillStyle='#ffd23f';
-  ctx.fillText('— CONTROLS —', W/2, py+22);
+  // header: CONTROLS with flanking rules
+  ctx.textAlign='center'; ctx.font='800 13px "Courier New",monospace'; ctx.fillStyle='#ffb24a';
+  const hLabel='CONTROLS';
+  ctx.fillText(hLabel, W/2, py+22);
+  const hbw = ctx.measureText(hLabel).width;
+  ctx.strokeStyle='rgba(255,138,42,0.45)'; ctx.lineWidth=1.5; ctx.beginPath();
+  ctx.moveTo(W/2 - hbw/2 - 14, py+18); ctx.lineTo(W/2 - hbw/2 - 46, py+18);
+  ctx.moveTo(W/2 + hbw/2 + 14, py+18); ctx.lineTo(W/2 + hbw/2 + 46, py+18); ctx.stroke();
 
-  const lx = W/2-228, dx = lx+96;
+  // key rows — keycaps right-aligned into a column so the pills line up
+  const capRight = px + 152, descX = px + 170;
   const keycap = (label, y)=>{
-    ctx.font='700 13px "Courier New",monospace';
-    const w = ctx.measureText(label).width + 14;
-    ctx.fillStyle='#1a1206'; roundRect(lx, y-13, w, 19, 4); ctx.fill();
-    ctx.strokeStyle='#ff7a1a'; ctx.lineWidth=1.4; roundRect(lx, y-13, w, 19, 4); ctx.stroke();
-    ctx.fillStyle='#ffd23f'; ctx.textAlign='center'; ctx.fillText(label, lx+w/2, y-2);
+    ctx.font='700 12px "Courier New",monospace';
+    const w = ctx.measureText(label).width + 16, x = capRight - w;
+    ctx.fillStyle='#241708'; roundRect(x, y-13, w, 20, 5); ctx.fill();
+    ctx.strokeStyle='#ff8a2a'; ctx.lineWidth=1.4; roundRect(x, y-13, w, 20, 5); ctx.stroke();
+    ctx.fillStyle='#ffd23f'; ctx.textAlign='center'; ctx.fillText(label, x+w/2, y-2.5);
   };
   const row = (label, desc, y)=>{
     keycap(label, y);
-    ctx.textAlign='left'; ctx.font='700 13px "Courier New",monospace'; ctx.fillStyle='#e8dcc0';
-    ctx.fillText(desc, dx, y-2);
+    ctx.textAlign='left'; ctx.font='700 13px "Courier New",monospace'; ctx.fillStyle='#efe4c8';
+    ctx.fillText(desc, descX, y-2.5);
   };
   const cap = (kbd, touch)=> IS_TOUCH ? touch : kbd;
-  row(cap('\u25B2 \u25BC','\u25B2 \u25BC'), 'change lane  \u00B7  flip while in the air', py+52);
-  row(cap('\u2192','BURN'),  'hold to BURN turbo \u2014 mind the TEMP', py+76);
-  row(cap('\u2190','BRAKE'), 'brake', py+100);
-  row(cap('SPACE','JUMP'),   'JUMP on the ground · toss trash while airborne', py+124);
+  row(cap('▲ ▼','▲ ▼'), 'change lane  ·  flip in the air', py+50);
+  row(cap('→','BURN'),  'hold to boost  ·  watch the TEMP', py+75);
+  row(cap('←','BRAKE'), 'brake', py+100);
+  row(cap('SPACE','JUMP'),   'jump  ·  toss trash in the air', py+125);
 
-  // notes (bulleted)
+  // divider between controls and rules
+  ctx.strokeStyle='rgba(255,122,26,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(px+24, py+148); ctx.lineTo(px+pw-24, py+148); ctx.stroke();
+
+  // rules / tips — icons in an aligned column
+  const tipIx = px+30, tipTx = px+50;
   ctx.textAlign='left'; ctx.font='700 12px "Courier New",monospace';
-  ctx.fillStyle='#5fd8ff'; ctx.fillText('\u203A\u203A', lx, py+150); ctx.fillStyle='#e8dcc0'; ctx.fillText('blue pads cool the engine  \u00B7  red pads = TURBO', lx+22, py+150);
-  ctx.fillStyle='#ff7a1a'; ctx.fillText('\u2605', lx+2, py+170); ctx.fillStyle='#e8dcc0'; ctx.fillText('finish TOP 3 each race \u2014 or you\'re TRASHED', lx+22, py+170);
-  ctx.fillStyle='#ff7a1a'; ctx.fillText('\u2605', lx+2, py+188); ctx.fillStyle='#e8dcc0'; ctx.fillText('flip + toss in one jump = COMBO bonus', lx+22, py+188);
+  ctx.fillStyle='#5fd8ff'; ctx.fillText('▸', tipIx, py+168); ctx.fillStyle='#e8dcc0'; ctx.fillText('blue pads cool  ·  red pads = TURBO', tipTx, py+168);
+  ctx.fillStyle='#ff7a1a'; ctx.fillText('★', tipIx, py+187); ctx.fillStyle='#e8dcc0'; ctx.fillText("finish TOP 3 each race, or you're TRASHED", tipTx, py+187);
+  ctx.fillStyle='#ffd23f'; ctx.fillText('★', tipIx, py+206); ctx.fillStyle='#e8dcc0'; ctx.fillText('flip + toss in one jump = COMBO bonus', tipTx, py+206);
 }
 
 function drawIntro(){
